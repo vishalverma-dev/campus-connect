@@ -1,0 +1,24 @@
+{
+  "name": "campus-connect-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node --watch --env-file=.env server.js",
+    "start": "node server.js",
+    "db:setup": "node --env-file=.env db/run.js db/schema.sql",
+    "db:seed": "node --env-file=.env db/run.js db/seed.sql",
+    "sql": "node --env-file=.env db/run.js"
+  },
+
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "module": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
+  }
+}
