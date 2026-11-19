@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import eventsRouter from './routes/events.js';
 import usersRouter from './routes/users.js';
+import authRouter from './routes/auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,6 +19,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   res.json({ message: 'CampusConnect API is running' });
 });
+app.use('/auth', authRouter);
 app.use('/events', eventsRouter);
 app.use('/users', usersRouter);
 
@@ -50,3 +52,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);
 });
+

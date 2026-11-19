@@ -5,8 +5,11 @@ DROP TABLE IF EXISTS users;
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT,
+  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'admin'))
 );
+
 
 CREATE TABLE events (
   id SERIAL PRIMARY KEY,

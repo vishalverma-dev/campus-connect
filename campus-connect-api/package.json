@@ -10,15 +10,16 @@
     "db:seed": "node --env-file=.env db/run.js db/seed.sql",
     "sql": "node --env-file=.env db/run.js"
   },
-
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "module": "commonjs",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "express": "^5.3.0",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.1"
   }
 }

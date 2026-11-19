@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import validateEvent from '../middleware/validateEvent.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -29,12 +30,11 @@ async function findEvent(id) {
   return result.rows[0];
 }
 
-// GET /events  (optional filters: ?category=Tech&q=web)
+// GET /events  (public)  optional filters: ?category=Tech&q=web
 router.get('/', async (req, res) => {
   const { category, q } = req.query;
   const conditions = [];
   const values = [];
-  console.log("category", category, "q", q);
   if (category) {
     values.push(category);
     conditions.push(`e.category = $${values.length}`);
@@ -43,21 +43,20 @@ router.get('/', async (req, res) => {
     values.push(`%${q}%`);
     conditions.push(`e.title ILIKE $${values.length}`);
   }
-  console.log("conditions", conditions, "values", values);
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const result = await pool.query(`${SELECT_EVENTS} ${where} GROUP BY e.id ORDER BY e.id`, values);
   res.json(result.rows);
 });
 
-// GET /events/:id
+// GET /events/:id  (public)
 router.get('/:id', parseId, async (req, res) => {
   const event = await findEvent(req.eventId);
   if (!event) return res.status(404).json({ error: 'Event not found' });
   res.json(event);
 });
 
-// POST /events
-router.post('/', validateEvent, async (req, res) => {
+// POST /events  (admin only)
+router.post('/', requireAuth, requireRole('admin'), validateEvent, async (req, res) => {
   const { title, club, category, date, seats } = req.body;
   const inserted = await pool.query(
     `INSERT INTO events (title, club, category, event_date, seats)
@@ -69,8 +68,8 @@ router.post('/', validateEvent, async (req, res) => {
   res.status(201).json(created);
 });
 
-// PUT /events/:id
-router.put('/:id', parseId, validateEvent, async (req, res) => {
+// PUT /events/:id  (admin only)
+router.put('/:id', requireAuth, requireRole('admin'), parseId, validateEvent, async (req, res) => {
   const { title, club, category, date, seats } = req.body;
   const updated = await pool.query(
     `UPDATE events
@@ -82,25 +81,43 @@ router.put('/:id', parseId, validateEvent, async (req, res) => {
   res.json(await findEvent(req.eventId));
 });
 
-// DELETE /events/:id
-router.delete('/:id', parseId, async (req, res) => {
+// DELETE /events/:id  (admin only)
+router.delete('/:id', requireAuth, requireRole('admin'), parseId, async (req, res) => {
   const result = await pool.query('DELETE FROM events WHERE id = $1', [req.eventId]);
   if (result.rowCount === 0) return res.status(404).json({ error: 'Event not found' });
   res.json({ message: 'Event deleted' });
 });
 
-// POST /events/:id/rsvp   (body: { "userId": 1 })
-router.post('/:id/rsvp', parseId, async (req, res) => {
-  const userId = Number(req.body && req.body.userId);
-  if (!Number.isInteger(userId) || userId < 1) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
+// POST /events/:id/rsvp  (any logged-in user, always for themselves)
+router.post('/:id/rsvp', requireAuth, parseId, async (req, res) => {
   const event = await findEvent(req.eventId);
   if (!event) return res.status(404).json({ error: 'Event not found' });
   if (event.registered >= event.seats) {
     return res.status(409).json({ error: 'Event is full' });
   }
-  await pool.query('INSERT INTO rsvps (user_id, event_id) VALUES ($1, $2)', [userId, req.eventId]);
+  try {
+    await pool.query(
+      'INSERT INTO rsvps (user_id, event_id) VALUES ($1, $2)',
+      [req.user.id, req.eventId]
+    );
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'You have already registered for this event' });
+    }
+    throw err;
+  }
+  res.json(await findEvent(req.eventId));
+});
+
+// DELETE /events/:id/rsvp  (cancel my own RSVP)
+router.delete('/:id/rsvp', requireAuth, parseId, async (req, res) => {
+  const result = await pool.query(
+    'DELETE FROM rsvps WHERE user_id = $1 AND event_id = $2',
+    [req.user.id, req.eventId]
+  );
+  if (result.rowCount === 0) {
+    return res.status(404).json({ error: 'You have not registered for this event' });
+  }
   res.json(await findEvent(req.eventId));
 });
 
